@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contact — NexTrade</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/dashboard.css"/>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html" class="logo">Nex<span>Trade</span></a></div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a href="trading.html"><span class="icon">📈</span> Trading</a>
+      <a href="investment-plans.html"><span class="icon">💼</span> Invest</a>
+      <a href="portfolio.html"><span class="icon">🗂️</span> Portfolio</a>
+      <a href="deposit-withdrawal.html"><span class="icon">💸</span> Deposit / Withdraw</a>
+      <a href="contact.html" class="active"><span class="icon">📞</span> Contact</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar" id="avatarInitial">?</div>
+        <div>
+          <div id="sidebarName" style="font-size:0.85rem;font-weight:600;"></div>
+          <div style="font-size:0.75rem;color:var(--muted);">Customer</div>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-block" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="top-bar"><h1>Contact & Support</h1></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+
+      <!-- CONTACT FORM -->
+      <div class="card">
+        <h3 style="margin-bottom:0.4rem;">📧 Send a Message</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.2rem;">We'll get back to you within 24 hours</p>
+        <div id="formAlert" style="display:none;" class="alert"></div>
+        <div class="form-group">
+          <label>Subject</label>
+          <select id="subject">
+            <option>Account Issue</option>
+            <option>Deposit / Withdrawal</option>
+            <option>Investment Plans</option>
+            <option>Trading Issue</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Message</label>
+          <textarea id="contactMessage" rows="5" placeholder="Describe your issue..."
+            style="width:100%;padding:0.75rem;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;outline:none;resize:vertical;"></textarea>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="sendContactMessage()">Send Message</button>
+      </div>
+
+      <!-- LIVE CHAT -->
+      <div class="card" style="display:flex;flex-direction:column;">
+        <h3 style="margin-bottom:0.4rem;">💬 Live Chat Support</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Chat with our support team in real-time</p>
+        <div id="chatMessages" style="flex:1;min-height:300px;max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:0.5rem;padding:0.5rem;background:var(--bg2);border-radius:8px;margin-bottom:1rem;"></div>
+        <div style="display:flex;gap:0.5rem;">
+          <input id="chatInput" type="text" placeholder="Type a message..." 
+            style="flex:1;padding:0.65rem 1rem;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);outline:none;font-size:0.9rem;"/>
+          <button class="btn btn-primary" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- INFO CARDS -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.2rem;margin-top:1.5rem;">
+      <div class="card" style="text-align:center;">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">📧</div>
+        <h4>Email Support</h4>
+        <p style="color:var(--muted);font-size:0.85rem;margin-top:0.4rem;">support@nextrade.com</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">⏰</div>
+        <h4>Support Hours</h4>
+        <p style="color:var(--muted);font-size:0.85rem;margin-top:0.4rem;">24/7 Live Chat<br/>Mon–Fri Email</p>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">⚡</div>
+        <h4>Response Time</h4>
+        <p style="color:var(--muted);font-size:0.85rem;margin-top:0.4rem;">Live Chat: Instant<br/>Email: Under 24hrs</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/utils.js"></script>
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script>
+  const user = requireCustomer();
+  if (user) {
+    document.getElementById('sidebarName').textContent = user.fullName;
+    document.getElementById('avatarInitial').textContent = user.fullName.charAt(0).toUpperCase();
+
+    const socket = io('http://localhost:5000', { reconnection: true, reconnectionDelay: 1000 });
+    socket.emit('join', user.id);
+
+    // Load chat history
+    apiFetch('/chat/my').then(msgs => {
+      msgs.forEach(m => appendMessage(m.message, m.isAdminReply ? 'support' : 'me'));
+    });
+
+    socket.on('receiveMessage', ({ message, isAdminReply }) => {
+      if (isAdminReply) appendMessage(message, 'support');
+    });
+
+    async function sendChat() {
+      const input = document.getElementById('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      await apiFetch('/chat', { method: 'POST', body: JSON.stringify({ message: msg }) });
+      socket.emit('sendMessage', { senderId: user.id, receiverId: 'admin', message: msg, isAdminReply: false });
+      appendMessage(msg, 'me');
+    }
+
+    document.getElementById('chatInput').addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
+    window.sendChat = sendChat;
+  }
+
+  function appendMessage(msg, from) {
+    const container = document.getElementById('chatMessages');
+    const isMe = from === 'me';
+    container.innerHTML += `
+      <div style="display:flex;justify-content:${isMe ? 'flex-end' : 'flex-start'};">
+        <div style="background:${isMe ? 'var(--primary)' : 'var(--border)'};color:${isMe ? '#000' : 'var(--text)'};padding:0.5rem 0.85rem;border-radius:12px;max-width:80%;font-size:0.88rem;">${msg}</div>
+      </div>`;
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function sendContactMessage() {
+    const subject = document.getElementById('subject').value;
+    const message = document.getElementById('contactMessage').value.trim();
+    const alertEl = document.getElementById('formAlert');
+    if (!message) {
+      alertEl.className = 'alert alert-error'; alertEl.textContent = 'Please enter a message.'; alertEl.style.display = 'block'; return;
+    }
+    try {
+      await apiFetch('/chat', { method: 'POST', body: JSON.stringify({ message: `[${subject}] ${message}` }) });
+      alertEl.className = 'alert alert-success';
+      alertEl.textContent = 'Message sent! Our team will respond shortly.';
+      alertEl.style.display = 'block';
+      document.getElementById('contactMessage').value = '';
+    } catch (err) {
+      alertEl.className = 'alert alert-error'; alertEl.textContent = err.message; alertEl.style.display = 'block';
+    }
+  }
+</script>
+<div id="google_translate_element"></div>
+<script src="js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

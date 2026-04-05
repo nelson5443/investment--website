@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Portfolio — NexTrade</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/dashboard.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html" class="logo">Nex<span>Trade</span></a></div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a href="trading.html"><span class="icon">📈</span> Trading</a>
+      <a href="investment-plans.html"><span class="icon">💼</span> Invest</a>
+      <a href="portfolio.html" class="active"><span class="icon">🗂️</span> Portfolio</a>
+      <a href="deposit-withdrawal.html"><span class="icon">💸</span> Deposit / Withdraw</a>
+      <a href="contact.html"><span class="icon">📞</span> Contact</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar" id="avatarInitial">?</div>
+        <div>
+          <div id="sidebarName" style="font-size:0.85rem;font-weight:600;"></div>
+          <div style="font-size:0.75rem;color:var(--muted);">Customer</div>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-block" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="top-bar"><h1>Portfolio</h1></div>
+
+    <!-- STAT CARDS -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="icon">💰</div>
+        <div class="label">Account Balance</div>
+        <div class="value" id="balance">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon">📥</div>
+        <div class="label">Total Invested</div>
+        <div class="value" id="totalInvested">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon">📈</div>
+        <div class="label">Expected Returns</div>
+        <div class="value" id="expectedReturns" style="color:var(--primary);">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon">🔄</div>
+        <div class="label">Total Trades</div>
+        <div class="value" id="totalTrades">0</div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+      <div class="card">
+        <div class="card-header"><h3>Investment Breakdown</h3></div>
+        <div class="chart-wrap"><canvas id="investChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Trade Activity</h3></div>
+        <div class="chart-wrap"><canvas id="tradeChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- INVESTMENTS TABLE -->
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-header">
+        <h3>My Investments</h3>
+        <a href="investment-plans.html" class="btn btn-primary" style="font-size:0.8rem;padding:0.4rem 0.9rem;">+ New Investment</a>
+      </div>
+      <table>
+        <thead><tr><th>Plan</th><th>Invested</th><th>Expected Return</th><th>Profit</th><th>Start</th><th>End Date</th><th>Status</th></tr></thead>
+        <tbody id="investmentsTable">
+          <tr><td colspan="7" style="color:var(--muted);text-align:center;">No investments yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TRADES TABLE -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Trade History</h3>
+        <a href="trading.html" class="btn btn-primary" style="font-size:0.8rem;padding:0.4rem 0.9rem;">+ New Trade</a>
+      </div>
+      <table>
+        <thead><tr><th>Asset</th><th>Type</th><th>Category</th><th>Qty</th><th>Price</th><th>Total</th><th>Date</th></tr></thead>
+        <tbody id="tradesTable">
+          <tr><td colspan="7" style="color:var(--muted);text-align:center;">No trades yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/utils.js"></script>
+<script>
+  const user = requireCustomer();
+  if (user) {
+    document.getElementById('sidebarName').textContent = user.fullName;
+    document.getElementById('avatarInitial').textContent = user.fullName.charAt(0).toUpperCase();
+
+    Promise.all([
+      apiFetch('/users/me'),
+      apiFetch('/plans/my'),
+      apiFetch('/trades/my')
+    ]).then(([profile, investments, trades]) => {
+
+      // Stats
+      document.getElementById('balance').textContent = formatCurrency(profile.balance);
+      document.getElementById('totalInvested').textContent = formatCurrency(profile.totalInvested);
+      document.getElementById('totalTrades').textContent = trades.length;
+
+      const totalExpected = investments.reduce((s, i) => s + i.expectedReturn, 0);
+      document.getElementById('expectedReturns').textContent = formatCurrency(totalExpected);
+
+      // Investments table
+      if (investments.length > 0) {
+        document.getElementById('investmentsTable').innerHTML = investments.map(inv => {
+          const profit = inv.expectedReturn - inv.amountInvested;
+          return `<tr>
+            <td>${inv.plan?.name || 'N/A'}</td>
+            <td>${formatCurrency(inv.amountInvested)}</td>
+            <td>${formatCurrency(inv.expectedReturn)}</td>
+            <td style="color:var(--primary);">+${formatCurrency(profit)}</td>
+            <td>${formatDate(inv.startDate)}</td>
+            <td>${formatDate(inv.endDate)}</td>
+            <td><span class="badge badge-${inv.status === 'active' ? 'success' : 'info'}">${inv.status}</span></td>
+          </tr>`;
+        }).join('');
+      }
+
+      // Trades table
+      if (trades.length > 0) {
+        document.getElementById('tradesTable').innerHTML = trades.map(t => `
+          <tr>
+            <td>${t.asset}</td>
+            <td><span class="badge badge-${t.type === 'buy' ? 'success' : 'danger'}">${t.type.toUpperCase()}</span></td>
+            <td style="text-transform:capitalize;">${t.assetType}</td>
+            <td>${t.quantity}</td>
+            <td>${formatCurrency(t.priceAtTrade)}</td>
+            <td>${formatCurrency(t.total)}</td>
+            <td>${formatDate(t.createdAt)}</td>
+          </tr>`).join('');
+      }
+
+      // Investment breakdown chart
+      const planNames = [...new Set(investments.map(i => i.plan?.name || 'Unknown'))];
+      const planTotals = planNames.map(name => investments.filter(i => i.plan?.name === name).reduce((s, i) => s + i.amountInvested, 0));
+      new Chart(document.getElementById('investChart'), {
+        type: 'pie',
+        data: {
+          labels: planNames.length ? planNames : ['No Data'],
+          datasets: [{ data: planTotals.length ? planTotals : [1], backgroundColor: ['#00c896','#3b82f6','#f59e0b','#ef4444','#8b5cf6'], borderWidth: 0 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e2e8f0' } } } }
+      });
+
+      // Trade activity bar chart
+      const buys = trades.filter(t => t.type === 'buy').length;
+      const sells = trades.filter(t => t.type === 'sell').length;
+      new Chart(document.getElementById('tradeChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Buy Orders', 'Sell Orders'],
+          datasets: [{ data: [buys, sells], backgroundColor: ['#00c896', '#ef4444'], borderRadius: 6, borderWidth: 0 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { ticks: { color: '#64748b' }, grid: { display: false } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1e2d45' } } }
+        }
+      });
+    });
+  }
+</script>
+<div id="google_translate_element"></div>
+<script src="js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

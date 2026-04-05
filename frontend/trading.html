@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trading — NexTrade</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/dashboard.css"/>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html" class="logo">Nex<span>Trade</span></a></div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a href="trading.html" class="active"><span class="icon">📈</span> Trading</a>
+      <a href="investment-plans.html"><span class="icon">💼</span> Invest</a>
+      <a href="portfolio.html"><span class="icon">🗂️</span> Portfolio</a>
+      <a href="deposit-withdrawal.html"><span class="icon">💸</span> Deposit / Withdraw</a>
+      <a href="contact.html"><span class="icon">📞</span> Contact</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar" id="avatarInitial">?</div>
+        <div>
+          <div id="sidebarName" style="font-size:0.85rem;font-weight:600;"></div>
+          <div style="font-size:0.75rem;color:var(--muted);">Customer</div>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-block" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <h1>Trading</h1>
+      <div style="color:var(--muted);font-size:0.9rem;">Balance: <strong id="balanceDisplay" style="color:var(--primary);">$0.00</strong></div>
+    </div>
+
+    <!-- ASSET TABS -->
+    <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;">
+      <button class="btn btn-primary" id="tab-crypto" onclick="switchTab('crypto')">🪙 Crypto</button>
+      <button class="btn btn-outline" id="tab-stock" onclick="switchTab('stock')">🏦 Stocks</button>
+      <button class="btn btn-outline" id="tab-forex" onclick="switchTab('forex')">💱 Forex</button>
+    </div>
+
+    <!-- ASSET SELECTOR -->
+    <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+      <select id="assetSelect" class="form-group" style="margin:0;padding:0.6rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;min-width:180px;" onchange="changeAsset()"></select>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span style="color:var(--muted);font-size:0.85rem;">Price:</span>
+        <strong id="currentPrice" style="color:var(--primary);font-size:1.1rem;">—</strong>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem;">
+
+      <!-- CHART -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div id="tradingview_chart" style="height:460px;"></div>
+      </div>
+
+      <!-- ORDER PANEL -->
+      <div>
+        <div class="card">
+          <h3 style="margin-bottom:1.2rem;">Place Order</h3>
+          <div style="display:flex;gap:0.5rem;margin-bottom:1.2rem;">
+            <button class="btn btn-primary" id="buyBtn" style="flex:1;" onclick="setOrderType('buy')">Buy</button>
+            <button class="btn btn-outline" id="sellBtn" style="flex:1;" onclick="setOrderType('sell')">Sell</button>
+          </div>
+          <div id="orderAlert" style="display:none;" class="alert"></div>
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label style="color:var(--muted);font-size:0.85rem;display:block;margin-bottom:0.4rem;">Quantity</label>
+            <input type="number" id="quantity" placeholder="0.00" min="0.01" step="0.01" oninput="calcTotal()"
+              style="width:100%;padding:0.75rem;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem;outline:none;"/>
+          </div>
+          <div style="background:var(--bg2);border-radius:8px;padding:0.75rem 1rem;font-size:0.88rem;margin-bottom:1.2rem;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
+              <span style="color:var(--muted);">Price per unit</span>
+              <span id="pricePerUnit">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:var(--muted);">Total Cost</span>
+              <strong id="totalCost" style="color:var(--primary);">$0.00</strong>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" onclick="placeOrder()">Place Order</button>
+        </div>
+
+        <!-- QUICK ASSETS -->
+        <div class="card">
+          <h3 style="margin-bottom:1rem;">Quick Select</h3>
+          <div id="quickAssets" style="display:flex;flex-direction:column;gap:0.5rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRADE HISTORY -->
+    <div class="card" style="margin-top:1.5rem;">
+      <div class="card-header"><h3>My Trade History</h3></div>
+      <table>
+        <thead><tr><th>Asset</th><th>Type</th><th>Qty</th><th>Price</th><th>Total</th><th>Date</th></tr></thead>
+        <tbody id="tradeHistory"><tr><td colspan="6" style="color:var(--muted);text-align:center;">No trades yet</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/utils.js"></script>
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+const assets = {
+  crypto: [
+    { symbol: 'BINANCE:BTCUSDT', label: 'BTC/USD', price: 67420 },
+    { symbol: 'BINANCE:ETHUSDT', label: 'ETH/USD', price: 3512 },
+    { symbol: 'BINANCE:SOLUSDT', label: 'SOL/USD', price: 172 },
+    { symbol: 'BINANCE:XRPUSDT', label: 'XRP/USD', price: 0.58 },
+    { symbol: 'BINANCE:BNBUSDT', label: 'BNB/USD', price: 412 },
+  ],
+  stock: [
+    { symbol: 'NASDAQ:AAPL', label: 'AAPL', price: 189.25 },
+    { symbol: 'NASDAQ:TSLA', label: 'TSLA', price: 248.60 },
+    { symbol: 'NASDAQ:AMZN', label: 'AMZN', price: 185.90 },
+    { symbol: 'NASDAQ:MSFT', label: 'MSFT', price: 415.30 },
+    { symbol: 'NASDAQ:GOOGL', label: 'GOOGL', price: 175.80 },
+  ],
+  forex: [
+    { symbol: 'FX:EURUSD', label: 'EUR/USD', price: 1.0821 },
+    { symbol: 'FX:GBPUSD', label: 'GBP/USD', price: 1.2634 },
+    { symbol: 'FX:USDJPY', label: 'USD/JPY', price: 149.82 },
+    { symbol: 'FX:AUDUSD', label: 'AUD/USD', price: 0.6512 },
+    { symbol: 'FX:USDCAD', label: 'USD/CAD', price: 1.3621 },
+  ]
+};
+
+let currentTab = 'crypto';
+let currentAsset = assets.crypto[0];
+let orderType = 'buy';
+let tvWidget = null;
+
+const user = requireCustomer();
+if (user) {
+  document.getElementById('sidebarName').textContent = user.fullName;
+  document.getElementById('avatarInitial').textContent = user.fullName.charAt(0).toUpperCase();
+
+  apiFetch('/users/me').then(p => {
+    document.getElementById('balanceDisplay').textContent = formatCurrency(p.balance);
+  });
+
+  loadTrades();
+  switchTab('crypto');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  ['crypto','stock','forex'].forEach(t => {
+    document.getElementById(`tab-${t}`).className = t === tab ? 'btn btn-primary' : 'btn btn-outline';
+  });
+  const list = assets[tab];
+  const select = document.getElementById('assetSelect');
+  select.innerHTML = list.map(a => `<option value="${a.symbol}">${a.label}</option>`).join('');
+  currentAsset = list[0];
+  updateAssetUI();
+  renderQuickAssets();
+}
+
+function changeAsset() {
+  const sym = document.getElementById('assetSelect').value;
+  currentAsset = assets[currentTab].find(a => a.symbol === sym);
+  updateAssetUI();
+}
+
+function updateAssetUI() {
+  // Add small random fluctuation to simulate live price
+  const fluctuation = (Math.random() - 0.5) * 0.002;
+  currentAsset.price = parseFloat((currentAsset.price * (1 + fluctuation)).toFixed(currentAsset.price < 10 ? 4 : 2));
+  document.getElementById('currentPrice').textContent = formatCurrency(currentAsset.price);
+  document.getElementById('pricePerUnit').textContent = formatCurrency(currentAsset.price);
+  calcTotal();
+  loadChart(currentAsset.symbol);
+}
+
+function loadChart(symbol) {
+  document.getElementById('tradingview_chart').innerHTML = '';
+  tvWidget = new TradingView.widget({
+    container_id: 'tradingview_chart',
+    symbol: symbol,
+    interval: '60',
+    theme: 'dark',
+    style: '1',
+    locale: 'en',
+    toolbar_bg: '#1a2235',
+    enable_publishing: false,
+    hide_side_toolbar: false,
+    allow_symbol_change: true,
+    autosize: true,
+  });
+}
+
+function renderQuickAssets() {
+  document.getElementById('quickAssets').innerHTML = assets[currentTab].map(a => `
+    <div onclick="selectQuick('${a.symbol}')" style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;border-radius:8px;cursor:pointer;border:1px solid var(--border);transition:all 0.2s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+      <span style="font-size:0.88rem;">${a.label}</span>
+      <span style="color:var(--primary);font-size:0.85rem;">${formatCurrency(a.price)}</span>
+    </div>`).join('');
+}
+
+function selectQuick(symbol) {
+  document.getElementById('assetSelect').value = symbol;
+  changeAsset();
+}
+
+function setOrderType(type) {
+  orderType = type;
+  document.getElementById('buyBtn').className = type === 'buy' ? 'btn btn-primary' : 'btn btn-outline';
+  document.getElementById('sellBtn').className = type === 'sell' ? 'btn btn-danger' : 'btn btn-outline';
+}
+
+function calcTotal() {
+  const qty = parseFloat(document.getElementById('quantity').value) || 0;
+  document.getElementById('totalCost').textContent = formatCurrency(qty * currentAsset.price);
+}
+
+async function placeOrder() {
+  const quantity = parseFloat(document.getElementById('quantity').value);
+  const alertEl = document.getElementById('orderAlert');
+  if (!quantity || quantity <= 0) {
+    alertEl.className = 'alert alert-error'; alertEl.textContent = 'Enter a valid quantity.'; alertEl.style.display = 'block'; return;
+  }
+  try {
+    await apiFetch('/trades', {
+      method: 'POST',
+      body: JSON.stringify({ asset: currentAsset.label, assetType: currentTab, type: orderType, quantity, priceAtTrade: currentAsset.price })
+    });
+    alertEl.className = 'alert alert-success';
+    alertEl.textContent = `${orderType.toUpperCase()} order placed for ${quantity} ${currentAsset.label}!`;
+    alertEl.style.display = 'block';
+    document.getElementById('quantity').value = '';
+    loadTrades();
+    setTimeout(() => alertEl.style.display = 'none', 3000);
+  } catch (err) {
+    alertEl.className = 'alert alert-error'; alertEl.textContent = err.message; alertEl.style.display = 'block';
+  }
+}
+
+async function loadTrades() {
+  const trades = await apiFetch('/trades/my');
+  const tbody = document.getElementById('tradeHistory');
+  if (trades.length === 0) return;
+  tbody.innerHTML = trades.map(t => `
+    <tr>
+      <td>${t.asset}</td>
+      <td><span class="badge badge-${t.type === 'buy' ? 'success' : 'danger'}">${t.type.toUpperCase()}</span></td>
+      <td>${t.quantity}</td>
+      <td>${formatCurrency(t.priceAtTrade)}</td>
+      <td>${formatCurrency(t.total)}</td>
+      <td>${formatDate(t.createdAt)}</td>
+    </tr>`).join('');
+}
+</script>
+<div id="google_translate_element"></div>
+<script src="js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

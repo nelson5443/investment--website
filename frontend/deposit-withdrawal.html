@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Deposit & Withdraw — NexTrade</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/dashboard.css"/>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html" class="logo">Nex<span>Trade</span></a></div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a href="trading.html"><span class="icon">📈</span> Trading</a>
+      <a href="investment-plans.html"><span class="icon">💼</span> Invest</a>
+      <a href="portfolio.html"><span class="icon">🗂️</span> Portfolio</a>
+      <a href="deposit-withdrawal.html" class="active"><span class="icon">💸</span> Deposit / Withdraw</a>
+      <a href="contact.html"><span class="icon">📞</span> Contact</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar" id="avatarInitial">?</div>
+        <div>
+          <div id="sidebarName" style="font-size:0.85rem;font-weight:600;"></div>
+          <div style="font-size:0.75rem;color:var(--muted);">Customer</div>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-block" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <h1>Deposit & Withdraw</h1>
+      <div style="color:var(--muted);font-size:0.9rem;">Balance: <strong id="balanceDisplay" style="color:var(--primary);">$0.00</strong></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+
+      <!-- DEPOSIT CARD -->
+      <div class="card">
+        <h3 style="margin-bottom:0.4rem;">💳 Deposit Funds</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.2rem;">Add funds to your trading account</p>
+
+        <!-- Plan summary banner (shown when coming from investment plans) -->
+        <div id="planBanner" style="display:none;background:var(--bg2);border:1px solid var(--primary);border-radius:8px;padding:1rem;margin-bottom:1.2rem;">
+          <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.4rem;">Selected Investment Plan</div>
+          <div style="font-weight:700;color:var(--primary);font-size:1rem;" id="bannerPlanName"></div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-top:0.3rem;" id="bannerPlanDetails"></div>
+          <input type="hidden" id="depositPlanId"/>
+        </div>
+
+        <div id="depositAlert" style="display:none;" class="alert"></div>
+        <div class="form-group">
+          <label>Amount (USD)</label>
+          <input type="number" id="depositAmount" placeholder="Min. $10" min="10"/>
+        </div>
+        <div class="form-group">
+          <label>Payment Method</label>
+          <select id="depositMethod">
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Bitcoin">Bitcoin (BTC)</option>
+            <option value="Ethereum">Ethereum (ETH)</option>
+            <option value="USDT">USDT (TRC20)</option>
+            <option value="Credit Card">Credit / Debit Card</option>
+          </select>
+        </div>
+        <div id="cryptoAddress" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+          <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.4rem;">Send to this address:</div>
+          <div id="walletAddress" style="font-size:0.82rem;word-break:break-all;color:var(--primary);"></div>
+          <button onclick="copyAddress()" class="btn btn-outline" style="margin-top:0.75rem;font-size:0.8rem;padding:0.35rem 0.8rem;">Copy Address</button>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="submitDeposit()">Request Deposit</button>
+      </div>
+
+      <!-- WITHDRAW CARD -->
+      <div class="card">
+        <h3 style="margin-bottom:0.4rem;">🏧 Withdraw Funds</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.2rem;">Withdraw funds from your account</p>
+        <div id="withdrawAlert" style="display:none;" class="alert"></div>
+        <div class="form-group">
+          <label>Amount (USD)</label>
+          <input type="number" id="withdrawAmount" placeholder="Min. $10" min="10"/>
+        </div>
+        <div class="form-group">
+          <label>Withdrawal Method</label>
+          <select id="withdrawMethod">
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Bitcoin">Bitcoin (BTC)</option>
+            <option value="Ethereum">Ethereum (ETH)</option>
+            <option value="USDT">USDT (TRC20)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Wallet / Account Details</label>
+          <input type="text" id="withdrawDetails" placeholder="Bank account or wallet address"/>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="submitWithdraw()">Request Withdrawal</button>
+      </div>
+    </div>
+
+    <!-- TRANSACTION HISTORY -->
+    <div class="card">
+      <div class="card-header"><h3>Transaction History</h3></div>
+      <table>
+        <thead><tr><th>Type</th><th>Amount</th><th>Method</th><th>Plan</th><th>Status</th><th>Note</th><th>Date</th></tr></thead>
+        <tbody id="txTable">
+          <tr><td colspan="7" style="color:var(--muted);text-align:center;">No transactions yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/utils.js"></script>
+<script>
+const cryptoAddresses = {
+  'Bitcoin': '1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf Na',
+  'Ethereum': '0x742d35Cc6634C0532925a3b8D4C9B7e5f1234567',
+  'USDT': 'TRx7NqWqY5v6bPkLmN3oJdKwXzA8cB2eF9'
+};
+
+const user = requireCustomer();
+if (user) {
+  document.getElementById('sidebarName').textContent = user.fullName;
+  document.getElementById('avatarInitial').textContent = user.fullName.charAt(0).toUpperCase();
+
+  apiFetch('/users/me').then(p => {
+    document.getElementById('balanceDisplay').textContent = formatCurrency(p.balance);
+  });
+
+  // Pre-fill from investment plan redirect
+  const params = new URLSearchParams(window.location.search);
+  const planId = params.get('planId');
+  const planName = params.get('planName');
+  const amount = params.get('amount');
+  const roi = params.get('roi');
+  const duration = params.get('duration');
+
+  if (planId && planName && amount) {
+    document.getElementById('depositPlanId').value = planId;
+    document.getElementById('depositAmount').value = amount;
+    document.getElementById('bannerPlanName').textContent = planName;
+    const expectedReturn = parseFloat(amount) + (parseFloat(amount) * parseFloat(roi)) / 100;
+    document.getElementById('bannerPlanDetails').textContent =
+      `Amount: ${formatCurrency(amount)} | ROI: ${roi}% | Duration: ${duration} days | Expected Return: ${formatCurrency(expectedReturn)}`;
+    document.getElementById('planBanner').style.display = 'block';
+  }
+
+  loadTransactions();
+
+  document.getElementById('depositMethod').addEventListener('change', function () {
+    const addr = cryptoAddresses[this.value];
+    const box = document.getElementById('cryptoAddress');
+    if (addr) {
+      document.getElementById('walletAddress').textContent = addr;
+      box.style.display = 'block';
+    } else {
+      box.style.display = 'none';
+    }
+  });
+}
+
+async function submitDeposit() {
+  const amount = parseFloat(document.getElementById('depositAmount').value);
+  const method = document.getElementById('depositMethod').value;
+  const planId = document.getElementById('depositPlanId').value;
+  const alertEl = document.getElementById('depositAlert');
+  if (!amount || amount < 10) {
+    alertEl.className = 'alert alert-error'; alertEl.textContent = 'Minimum deposit is $10.'; alertEl.style.display = 'block'; return;
+  }
+  try {
+    await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({ type: 'deposit', amount, method, planId: planId || null }) });
+    alertEl.className = 'alert alert-success';
+    alertEl.textContent = planId
+      ? 'Deposit request submitted! Your investment will activate once admin approves.'
+      : 'Deposit request submitted! Awaiting admin approval.';
+    alertEl.style.display = 'block';
+    document.getElementById('depositAmount').value = '';
+    document.getElementById('planBanner').style.display = 'none';
+    document.getElementById('depositPlanId').value = '';
+    loadTransactions();
+  } catch (err) {
+    alertEl.className = 'alert alert-error'; alertEl.textContent = err.message; alertEl.style.display = 'block';
+  }
+}
+
+async function submitWithdraw() {
+  const amount = parseFloat(document.getElementById('withdrawAmount').value);
+  const method = document.getElementById('withdrawMethod').value;
+  const alertEl = document.getElementById('withdrawAlert');
+  if (!amount || amount < 10) {
+    alertEl.className = 'alert alert-error'; alertEl.textContent = 'Minimum withdrawal is $10.'; alertEl.style.display = 'block'; return;
+  }
+  try {
+    await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({ type: 'withdrawal', amount, method }) });
+    alertEl.className = 'alert alert-success';
+    alertEl.textContent = 'Withdrawal request submitted! Awaiting admin approval.';
+    alertEl.style.display = 'block';
+    document.getElementById('withdrawAmount').value = '';
+    document.getElementById('withdrawDetails').value = '';
+    loadTransactions();
+  } catch (err) {
+    alertEl.className = 'alert alert-error'; alertEl.textContent = err.message; alertEl.style.display = 'block';
+  }
+}
+
+async function loadTransactions() {
+  const txns = await apiFetch('/transactions/my');
+  const tbody = document.getElementById('txTable');
+  if (txns.length === 0) return;
+  tbody.innerHTML = txns.map(t => `
+    <tr>
+      <td style="text-transform:capitalize;">${t.type}</td>
+      <td>${formatCurrency(t.amount)}</td>
+      <td>${t.method || '—'}</td>
+      <td>${t.planId ? `<span style="color:var(--primary);font-size:0.82rem;">${t.planId.name}</span>` : '—'}</td>
+      <td><span class="badge badge-${t.status === 'approved' ? 'success' : t.status === 'rejected' ? 'danger' : 'warning'}">${t.status}</span></td>
+      <td style="color:var(--muted);font-size:0.82rem;">${t.note || '—'}</td>
+      <td>${formatDate(t.createdAt)}</td>
+    </tr>`).join('');
+}
+
+function copyAddress() {
+  const addr = document.getElementById('walletAddress').textContent;
+  navigator.clipboard.writeText(addr).then(() => alert('Address copied!'));
+}
+</script>
+<div id="google_translate_element"></div>
+<script src="js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — NexTrade</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/dashboard.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo"><a href="index.html" class="logo">Nex<span>Trade</span></a></div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="active"><span class="icon">📊</span> Dashboard</a>
+      <a href="trading.html"><span class="icon">📈</span> Trading</a>
+      <a href="investment-plans.html"><span class="icon">💼</span> Invest</a>
+      <a href="portfolio.html"><span class="icon">🗂️</span> Portfolio</a>
+      <a href="deposit-withdrawal.html"><span class="icon">💸</span> Deposit / Withdraw</a>
+      <a href="contact.html"><span class="icon">📞</span> Contact</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar" id="avatarInitial">?</div>
+        <div>
+          <div id="sidebarName" style="font-size:0.85rem;font-weight:600;"></div>
+          <div style="font-size:0.75rem;color:var(--muted);">Customer</div>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-block" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="top-bar">
+      <h1>Dashboard</h1>
+      <a href="deposit-withdrawal.html" class="btn btn-primary">+ Deposit</a>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="icon">💰</div>
+        <div class="label">Account Balance</div>
+        <div class="value" id="balance">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon">📥</div>
+        <div class="label">Total Invested</div>
+        <div class="value" id="totalInvested">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon">📈</div>
+        <div class="label">Total Returns</div>
+        <div class="value" id="totalReturns">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon">🗂️</div>
+        <div class="label">Active Investments</div>
+        <div class="value" id="activeInvestments">0</div>
+      </div>
+    </div>
+
+    <!-- CHART + RECENT INVESTMENTS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+      <div class="card">
+        <div class="card-header"><h3>Portfolio Overview</h3></div>
+        <div class="chart-wrap"><canvas id="portfolioChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Active Investments</h3>
+          <a href="investment-plans.html" class="btn btn-primary" style="font-size:0.8rem;padding:0.4rem 0.9rem;">+ Invest</a>
+        </div>
+        <table>
+          <thead><tr><th>Plan</th><th>Invested</th><th>Return</th><th>Status</th></tr></thead>
+          <tbody id="investmentsTable"><tr><td colspan="4" style="color:var(--muted);text-align:center;">No investments yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RECENT TRANSACTIONS -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Recent Transactions</h3>
+        <a href="deposit-withdrawal.html" class="btn btn-outline" style="font-size:0.8rem;padding:0.4rem 0.9rem;">View All</a>
+      </div>
+      <table>
+        <thead><tr><th>Type</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody id="transactionsTable"><tr><td colspan="5" style="color:var(--muted);text-align:center;">No transactions yet</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- LIVE CHAT BUBBLE -->
+    <div id="chatBubble" style="position:fixed;bottom:2rem;right:2rem;z-index:300;">
+      <button class="btn btn-primary" style="border-radius:50%;width:56px;height:56px;font-size:1.4rem;" onclick="toggleChat()">💬</button>
+    </div>
+    <div id="chatBox" style="display:none;position:fixed;bottom:6rem;right:2rem;width:320px;z-index:300;">
+      <div class="card" style="margin:0;padding:0;overflow:hidden;">
+        <div style="background:var(--primary);padding:1rem;display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#000;font-weight:700;">Live Support</span>
+          <button onclick="toggleChat()" style="background:none;border:none;color:#000;cursor:pointer;font-size:1.2rem;">✕</button>
+        </div>
+        <div id="chatMessages" style="height:260px;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.5rem;"></div>
+        <div style="padding:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem;">
+          <input id="chatInput" type="text" placeholder="Type a message..." style="flex:1;padding:0.5rem;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;"/>
+          <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/utils.js"></script>
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script>
+  const user = requireCustomer();
+  if (user) {
+    document.getElementById('sidebarName').textContent = user.fullName;
+    document.getElementById('avatarInitial').textContent = user.fullName.charAt(0).toUpperCase();
+
+    // Load profile
+    apiFetch('/users/me').then(profile => {
+      document.getElementById('balance').textContent = formatCurrency(profile.balance);
+      document.getElementById('totalInvested').textContent = formatCurrency(profile.totalInvested);
+      document.getElementById('totalReturns').textContent = formatCurrency(profile.totalReturns);
+    });
+
+    // Load investments
+    apiFetch('/plans/my').then(investments => {
+      const active = investments.filter(i => i.status === 'active');
+      document.getElementById('activeInvestments').textContent = active.length;
+      const tbody = document.getElementById('investmentsTable');
+      if (investments.length === 0) return;
+      tbody.innerHTML = investments.slice(0, 5).map(inv => `
+        <tr>
+          <td>${inv.plan?.name || 'N/A'}</td>
+          <td>${formatCurrency(inv.amountInvested)}</td>
+          <td>${formatCurrency(inv.expectedReturn)}</td>
+          <td><span class="badge badge-${inv.status === 'active' ? 'success' : 'info'}">${inv.status}</span></td>
+        </tr>`).join('');
+
+      // Chart
+      new Chart(document.getElementById('portfolioChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Invested', 'Returns', 'Balance'],
+          datasets: [{ data: [
+            investments.reduce((s, i) => s + i.amountInvested, 0),
+            investments.reduce((s, i) => s + i.expectedReturn - i.amountInvested, 0),
+            parseFloat(document.getElementById('balance').textContent.replace(/[$,]/g, ''))
+          ], backgroundColor: ['#3b82f6', '#00c896', '#f59e0b'], borderWidth: 0 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e2e8f0' } } } }
+      });
+    });
+
+    // Load transactions
+    apiFetch('/transactions/my').then(txns => {
+      const tbody = document.getElementById('transactionsTable');
+      if (txns.length === 0) return;
+      tbody.innerHTML = txns.slice(0, 5).map(t => `
+        <tr>
+          <td style="text-transform:capitalize;">${t.type}</td>
+          <td>${formatCurrency(t.amount)}</td>
+          <td>${t.method || '—'}</td>
+          <td><span class="badge badge-${t.status === 'approved' ? 'success' : t.status === 'rejected' ? 'danger' : 'warning'}">${t.status}</span></td>
+          <td>${formatDate(t.createdAt)}</td>
+        </tr>`).join('');
+    });
+
+    // Socket.io live chat
+    const socket = io('http://localhost:5000', { reconnection: true, reconnectionDelay: 1000 });
+    socket.emit('join', user.id);
+
+    function toggleChat() {
+      const box = document.getElementById('chatBox');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+      if (box.style.display === 'block') loadChatHistory();
+    }
+    window.toggleChat = toggleChat;
+
+    async function loadChatHistory() {
+      const msgs = await apiFetch('/chat/my');
+      const container = document.getElementById('chatMessages');
+      container.innerHTML = msgs.map(m => chatBubbleHTML(m.message, m.isAdminReply ? 'support' : 'me')).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function chatBubbleHTML(msg, from) {
+      const isMe = from === 'me';
+      return `<div style="display:flex;justify-content:${isMe ? 'flex-end' : 'flex-start'};">
+        <div style="background:${isMe ? 'var(--primary)' : 'var(--border)'};color:${isMe ? '#000' : 'var(--text)'};padding:0.5rem 0.85rem;border-radius:12px;max-width:80%;font-size:0.85rem;">${msg}</div>
+      </div>`;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      await apiFetch('/chat', { method: 'POST', body: JSON.stringify({ message: msg }) });
+      socket.emit('sendMessage', { senderId: user.id, receiverId: 'admin', message: msg, isAdminReply: false });
+      const container = document.getElementById('chatMessages');
+      container.innerHTML += chatBubbleHTML(msg, 'me');
+      container.scrollTop = container.scrollHeight;
+    }
+    window.sendMessage = sendMessage;
+
+    document.getElementById('chatInput').addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+
+    socket.on('receiveMessage', ({ message, isAdminReply }) => {
+      if (!isAdminReply) return;
+      const container = document.getElementById('chatMessages');
+      container.innerHTML += chatBubbleHTML(message, 'support');
+      container.scrollTop = container.scrollHeight;
+    });
+  }
+</script>
+<div id="google_translate_element"></div>
+<script src="js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

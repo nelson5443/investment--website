@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Investments — NexTrade Admin</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="adminSidebar"></aside>
+  <main class="main-content">
+    <div class="top-bar"><h1>All Investments</h1></div>
+
+    <div class="stat-cards" style="margin-bottom:1.5rem;">
+      <div class="stat-card"><div class="icon">📈</div><div class="label">Total Investments</div><div class="value" id="totalInv">0</div></div>
+      <div class="stat-card"><div class="icon">✅</div><div class="label">Active</div><div class="value" id="activeInv">0</div></div>
+      <div class="stat-card"><div class="icon">💰</div><div class="label">Total Invested</div><div class="value" id="totalAmt">$0</div></div>
+      <div class="stat-card"><div class="icon">📊</div><div class="label">Expected Returns</div><div class="value" id="totalReturns">$0</div></div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead><tr><th>User</th><th>Plan</th><th>Invested</th><th>Expected Return</th><th>Profit</th><th>End Date</th><th>Status</th></tr></thead>
+        <tbody id="invTable"><tr><td colspan="7" style="color:var(--muted);text-align:center;">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="admin-utils.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  const admin = requireAdmin();
+  if (admin) {
+    renderAdminSidebar('Investments');
+    apiFetch('/plans/all').then(investments => {
+      document.getElementById('totalInv').textContent = investments.length;
+      document.getElementById('activeInv').textContent = investments.filter(i => i.status === 'active').length;
+      document.getElementById('totalAmt').textContent = formatCurrency(investments.reduce((s, i) => s + i.amountInvested, 0));
+      document.getElementById('totalReturns').textContent = formatCurrency(investments.reduce((s, i) => s + i.expectedReturn, 0));
+
+      document.getElementById('invTable').innerHTML = investments.length === 0
+        ? '<tr><td colspan="7" style="color:var(--muted);text-align:center;">No investments yet</td></tr>'
+        : investments.map(i => `
+          <tr>
+            <td>${i.user?.fullName || '—'}<br/><span style="color:var(--muted);font-size:0.78rem;">${i.user?.email || ''}</span></td>
+            <td>${i.plan?.name || '—'}</td>
+            <td>${formatCurrency(i.amountInvested)}</td>
+            <td>${formatCurrency(i.expectedReturn)}</td>
+            <td style="color:var(--primary);">+${formatCurrency(i.expectedReturn - i.amountInvested)}</td>
+            <td>${formatDate(i.endDate)}</td>
+            <td><span class="badge badge-${i.status === 'active' ? 'success' : 'info'}">${i.status}</span></td>
+          </tr>`).join('');
+    });
+  }
+</script>
+<div id="google_translate_element"></div>
+<script src="../js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

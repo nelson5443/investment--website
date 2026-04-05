@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Users — NexTrade Admin</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="adminSidebar"></aside>
+  <main class="main-content">
+    <div class="top-bar">
+      <h1>User Management</h1>
+      <input id="searchInput" type="text" placeholder="Search users..." oninput="filterUsers()"
+        style="padding:0.55rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);outline:none;width:220px;"/>
+    </div>
+
+    <div class="stat-cards" style="margin-bottom:1.5rem;">
+      <div class="stat-card"><div class="icon">👥</div><div class="label">Total Users</div><div class="value" id="totalUsers">0</div></div>
+      <div class="stat-card"><div class="icon">✅</div><div class="label">Active</div><div class="value" id="activeUsers">0</div></div>
+      <div class="stat-card"><div class="icon">🚫</div><div class="label">Suspended</div><div class="value" id="suspendedUsers">0</div></div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Balance</th><th>Invested</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody id="usersTable"><tr><td colspan="7" style="color:var(--muted);text-align:center;">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- EDIT BALANCE MODAL -->
+<div class="modal-overlay" id="balanceModal">
+  <div class="modal">
+    <h3>Edit Balance — <span id="modalUserName"></span></h3>
+    <div class="form-group" style="margin-top:1rem;">
+      <label>New Balance (USD)</label>
+      <input type="number" id="newBalance" placeholder="0.00"/>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" style="flex:1;" onclick="saveBalance()">Save</button>
+      <button class="btn btn-outline" onclick="document.getElementById('balanceModal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin-utils.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  let allUsers = [];
+  let editingUserId = null;
+  const admin = requireAdmin();
+
+  if (admin) {
+    renderAdminSidebar('Users');
+    loadUsers();
+  }
+
+  async function loadUsers() {
+    allUsers = await apiFetch('/users');
+    document.getElementById('totalUsers').textContent = allUsers.length;
+    document.getElementById('activeUsers').textContent = allUsers.filter(u => u.isActive).length;
+    document.getElementById('suspendedUsers').textContent = allUsers.filter(u => !u.isActive).length;
+    renderTable(allUsers);
+  }
+
+  function renderTable(users) {
+    document.getElementById('usersTable').innerHTML = users.length === 0
+      ? '<tr><td colspan="7" style="color:var(--muted);text-align:center;">No users found</td></tr>'
+      : users.map(u => `
+        <tr>
+          <td>${u.fullName}</td>
+          <td style="color:var(--muted);font-size:0.82rem;">${u.email}</td>
+          <td>${formatCurrency(u.balance)}</td>
+          <td>${formatCurrency(u.totalInvested)}</td>
+          <td><span class="badge badge-${u.isActive ? 'success' : 'danger'}">${u.isActive ? 'Active' : 'Suspended'}</span></td>
+          <td>${formatDate(u.createdAt)}</td>
+          <td style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+            <button class="btn btn-accent" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="openBalanceModal('${u._id}','${u.fullName}',${u.balance})">Edit Balance</button>
+            <button class="btn btn-${u.isActive ? 'danger' : 'primary'}" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="toggleUser('${u._id}')">${u.isActive ? 'Suspend' : 'Activate'}</button>
+          </td>
+        </tr>`).join('');
+  }
+
+  function filterUsers() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    renderTable(allUsers.filter(u => u.fullName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+  }
+
+  function openBalanceModal(id, name, balance) {
+    editingUserId = id;
+    document.getElementById('modalUserName').textContent = name;
+    document.getElementById('newBalance').value = balance;
+    document.getElementById('balanceModal').classList.add('open');
+  }
+
+  async function saveBalance() {
+    const balance = parseFloat(document.getElementById('newBalance').value);
+    await apiFetch(`/users/${editingUserId}/balance`, { method: 'PUT', body: JSON.stringify({ balance }) });
+    document.getElementById('balanceModal').classList.remove('open');
+    loadUsers();
+  }
+
+  async function toggleUser(id) {
+    await apiFetch(`/users/${id}/toggle`, { method: 'PUT' });
+    loadUsers();
+  }
+</script>
+<div id="google_translate_element"></div>
+<script src="../js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

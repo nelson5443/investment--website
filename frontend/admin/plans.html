@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plans — NexTrade Admin</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="adminSidebar"></aside>
+  <main class="main-content">
+    <div class="top-bar">
+      <h1>Investment Plans</h1>
+      <button class="btn btn-primary" onclick="openModal()">+ Add Plan</button>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead><tr><th>Name</th><th>ROI %</th><th>Min</th><th>Max</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="plansTable"><tr><td colspan="7" style="color:var(--muted);text-align:center;">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- PLAN MODAL -->
+<div class="modal-overlay" id="planModal">
+  <div class="modal">
+    <h3 id="modalTitle">Add New Plan</h3>
+    <div id="modalAlert" style="display:none;" class="alert"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+      <div class="form-group" style="margin:0;">
+        <label>Plan Name</label>
+        <input type="text" id="planName" placeholder="e.g. Starter"/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>ROI %</label>
+        <input type="number" id="planRoi" placeholder="e.g. 10"/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Min Amount ($)</label>
+        <input type="number" id="planMin" placeholder="100"/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Max Amount ($)</label>
+        <input type="number" id="planMax" placeholder="9999"/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Duration (Days)</label>
+        <input type="number" id="planDuration" placeholder="7"/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Status</label>
+        <select id="planStatus">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:1rem;">
+      <label>Description</label>
+      <input type="text" id="planDesc" placeholder="Short description (optional)"/>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" style="flex:1;" onclick="savePlan()">Save Plan</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin-utils.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  let editingPlanId = null;
+  const admin = requireAdmin();
+  if (admin) { renderAdminSidebar('Plans'); loadPlans(); }
+
+  async function loadPlans() {
+    const plans = await apiFetch('/plans');
+    document.getElementById('plansTable').innerHTML = plans.length === 0
+      ? '<tr><td colspan="7" style="color:var(--muted);text-align:center;">No plans yet</td></tr>'
+      : plans.map(p => `
+        <tr>
+          <td>${p.name}</td>
+          <td style="color:var(--primary);font-weight:700;">${p.roiPercent}%</td>
+          <td>${formatCurrency(p.minAmount)}</td>
+          <td>${formatCurrency(p.maxAmount)}</td>
+          <td>${p.durationDays} days</td>
+          <td><span class="badge badge-${p.isActive ? 'success' : 'danger'}">${p.isActive ? 'Active' : 'Inactive'}</span></td>
+          <td style="display:flex;gap:0.4rem;">
+            <button class="btn btn-accent" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick='editPlan(${JSON.stringify(p)})'>Edit</button>
+            <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="deletePlan('${p._id}')">Delete</button>
+          </td>
+        </tr>`).join('');
+  }
+
+  function openModal() {
+    editingPlanId = null;
+    document.getElementById('modalTitle').textContent = 'Add New Plan';
+    ['planName','planRoi','planMin','planMax','planDuration','planDesc'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('planStatus').value = 'true';
+    document.getElementById('modalAlert').style.display = 'none';
+    document.getElementById('planModal').classList.add('open');
+  }
+
+  function editPlan(plan) {
+    editingPlanId = plan._id;
+    document.getElementById('modalTitle').textContent = 'Edit Plan';
+    document.getElementById('planName').value = plan.name;
+    document.getElementById('planRoi').value = plan.roiPercent;
+    document.getElementById('planMin').value = plan.minAmount;
+    document.getElementById('planMax').value = plan.maxAmount;
+    document.getElementById('planDuration').value = plan.durationDays;
+    document.getElementById('planDesc').value = plan.description || '';
+    document.getElementById('planStatus').value = String(plan.isActive);
+    document.getElementById('modalAlert').style.display = 'none';
+    document.getElementById('planModal').classList.add('open');
+  }
+
+  function closeModal() { document.getElementById('planModal').classList.remove('open'); }
+
+  async function savePlan() {
+    const alertEl = document.getElementById('modalAlert');
+    const body = {
+      name: document.getElementById('planName').value,
+      roiPercent: parseFloat(document.getElementById('planRoi').value),
+      minAmount: parseFloat(document.getElementById('planMin').value),
+      maxAmount: parseFloat(document.getElementById('planMax').value),
+      durationDays: parseInt(document.getElementById('planDuration').value),
+      description: document.getElementById('planDesc').value,
+      isActive: document.getElementById('planStatus').value === 'true'
+    };
+    try {
+      if (editingPlanId) {
+        await apiFetch(`/plans/${editingPlanId}`, { method: 'PUT', body: JSON.stringify(body) });
+      } else {
+        await apiFetch('/plans', { method: 'POST', body: JSON.stringify(body) });
+      }
+      closeModal(); loadPlans();
+    } catch (err) {
+      alertEl.className = 'alert alert-error'; alertEl.textContent = err.message; alertEl.style.display = 'block';
+    }
+  }
+
+  async function deletePlan(id) {
+    if (!confirm('Delete this plan?')) return;
+    await apiFetch(`/plans/${id}`, { method: 'DELETE' });
+    loadPlans();
+  }
+</script>
+<div id="google_translate_element"></div>
+<script src="../js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

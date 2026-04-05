@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Investment Plans — NexTrade</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/dashboard.css"/>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html" class="logo">Nex<span>Trade</span></a></div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"><span class="icon">📊</span> Dashboard</a>
+      <a href="trading.html"><span class="icon">📈</span> Trading</a>
+      <a href="investment-plans.html" class="active"><span class="icon">💼</span> Invest</a>
+      <a href="portfolio.html"><span class="icon">🗂️</span> Portfolio</a>
+      <a href="deposit-withdrawal.html"><span class="icon">💸</span> Deposit / Withdraw</a>
+      <a href="contact.html"><span class="icon">📞</span> Contact</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar" id="avatarInitial">?</div>
+        <div>
+          <div id="sidebarName" style="font-size:0.85rem;font-weight:600;"></div>
+          <div style="font-size:0.75rem;color:var(--muted);">Customer</div>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-block" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <h1>Investment Plans</h1>
+      <div style="color:var(--muted);font-size:0.9rem;">Balance: <strong id="balanceDisplay" style="color:var(--primary);">$0.00</strong></div>
+    </div>
+
+    <!-- ACTIVE INVESTMENTS -->
+    <div class="card" style="margin-bottom:2rem;">
+      <div class="card-header"><h3>My Active Investments</h3></div>
+      <table>
+        <thead>
+          <tr><th>Plan</th><th>Invested</th><th>Expected Return</th><th>ROI</th><th>End Date</th><th>Status</th></tr>
+        </thead>
+        <tbody id="myInvestments">
+          <tr><td colspan="6" style="color:var(--muted);text-align:center;">No active investments</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- AVAILABLE PLANS -->
+    <h2 style="margin-bottom:1.2rem;">Available Plans</h2>
+    <div class="invest-plans" id="plansGrid">
+      <div style="color:var(--muted);">Loading plans...</div>
+    </div>
+  </main>
+</div>
+
+<!-- INVEST MODAL -->
+<div class="modal-overlay" id="investModal">
+  <div class="modal">
+    <h3>Invest in <span id="modalPlanName"></span></h3>
+    <div style="background:var(--bg2);border-radius:8px;padding:1rem;margin-bottom:1.2rem;font-size:0.88rem;color:var(--muted);line-height:1.8;">
+      ROI: <strong id="modalRoi" style="color:var(--primary);"></strong> &nbsp;|&nbsp;
+      Duration: <strong id="modalDuration" style="color:var(--text);"></strong> days<br/>
+      Min: <strong id="modalMin" style="color:var(--text);"></strong> &nbsp;|&nbsp;
+      Max: <strong id="modalMax" style="color:var(--text);"></strong>
+    </div>
+    <div id="modalAlert" style="display:none;" class="alert"></div>
+    <div class="form-group">
+      <label>Amount to Invest (USD)</label>
+      <input type="number" id="investAmount" placeholder="Enter amount"/>
+    </div>
+    <div style="background:var(--bg2);border-radius:8px;padding:0.75rem 1rem;font-size:0.88rem;margin-bottom:0.5rem;">
+      Expected Return: <strong id="expectedReturn" style="color:var(--primary);">$0.00</strong>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" style="flex:1;" onclick="confirmInvest()">Confirm Investment</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/utils.js"></script>
+<script>
+  const user = requireCustomer();
+  let selectedPlan = null;
+
+  if (user) {
+    document.getElementById('sidebarName').textContent = user.fullName;
+    document.getElementById('avatarInitial').textContent = user.fullName.charAt(0).toUpperCase();
+
+    // Load balance
+    apiFetch('/users/me').then(profile => {
+      document.getElementById('balanceDisplay').textContent = formatCurrency(profile.balance);
+    });
+
+    // Load plans
+    apiFetch('/plans').then(plans => {
+      const grid = document.getElementById('plansGrid');
+      if (plans.length === 0) {
+        grid.innerHTML = '<div style="color:var(--muted);">No plans available yet.</div>';
+        return;
+      }
+      grid.innerHTML = plans.map(plan => `
+        <div class="invest-plan-card">
+          <h3>${plan.name}</h3>
+          <div class="roi-big">${plan.roiPercent}%</div>
+          <div style="color:var(--muted);font-size:0.75rem;margin-top:0.25rem;">Return on Investment</div>
+          <div class="plan-meta">
+            Min: ${formatCurrency(plan.minAmount)}<br/>
+            Max: ${formatCurrency(plan.maxAmount)}<br/>
+            Duration: ${plan.durationDays} Days<br/>
+            ${plan.description || ''}
+          </div>
+          <button class="btn btn-primary btn-block" onclick='openModal(${JSON.stringify(plan)})'>Invest Now</button>
+        </div>`).join('');
+    });
+
+    // Load my investments
+    apiFetch('/plans/my').then(investments => {
+      const tbody = document.getElementById('myInvestments');
+      if (investments.length === 0) return;
+      tbody.innerHTML = investments.map(inv => {
+        const roi = inv.expectedReturn - inv.amountInvested;
+        return `<tr>
+          <td>${inv.plan?.name || 'N/A'}</td>
+          <td>${formatCurrency(inv.amountInvested)}</td>
+          <td>${formatCurrency(inv.expectedReturn)}</td>
+          <td style="color:var(--primary);">+${formatCurrency(roi)}</td>
+          <td>${formatDate(inv.endDate)}</td>
+          <td><span class="badge badge-${inv.status === 'active' ? 'success' : 'info'}">${inv.status}</span></td>
+        </tr>`;
+      }).join('');
+    });
+  }
+
+  function openModal(plan) {
+    selectedPlan = plan;
+    document.getElementById('modalPlanName').textContent = plan.name;
+    document.getElementById('modalRoi').textContent = plan.roiPercent + '%';
+    document.getElementById('modalDuration').textContent = plan.durationDays;
+    document.getElementById('modalMin').textContent = formatCurrency(plan.minAmount);
+    document.getElementById('modalMax').textContent = formatCurrency(plan.maxAmount);
+    document.getElementById('investAmount').value = '';
+    document.getElementById('expectedReturn').textContent = '$0.00';
+    document.getElementById('modalAlert').style.display = 'none';
+    document.getElementById('investModal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('investModal').classList.remove('open');
+    selectedPlan = null;
+  }
+
+  document.getElementById('investAmount').addEventListener('input', function () {
+    if (!selectedPlan) return;
+    const amount = parseFloat(this.value) || 0;
+    const expected = amount + (amount * selectedPlan.roiPercent) / 100;
+    document.getElementById('expectedReturn').textContent = formatCurrency(expected);
+  });
+
+  async function confirmInvest() {
+    const amount = parseFloat(document.getElementById('investAmount').value);
+    const alertEl = document.getElementById('modalAlert');
+    if (!amount || amount <= 0) {
+      alertEl.className = 'alert alert-error';
+      alertEl.textContent = 'Please enter a valid amount.';
+      alertEl.style.display = 'block';
+      return;
+    }
+    // Redirect to deposit page with plan info pre-filled
+    closeModal();
+    window.location.href = `deposit-withdrawal.html?planId=${selectedPlan._id}&planName=${encodeURIComponent(selectedPlan.name)}&amount=${amount}&roi=${selectedPlan.roiPercent}&duration=${selectedPlan.durationDays}`;
+  }
+</script>
+<div id="google_translate_element"></div>
+<script src="js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

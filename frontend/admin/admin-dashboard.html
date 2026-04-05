@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Dashboard — NexTrade</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="adminSidebar"></aside>
+  <main class="main-content">
+    <div class="top-bar"><h1>Admin Dashboard</h1><span style="color:var(--muted);font-size:0.85rem;" id="dateDisplay"></span></div>
+
+    <div class="stat-cards">
+      <div class="stat-card"><div class="icon">👥</div><div class="label">Total Users</div><div class="value" id="totalUsers">0</div></div>
+      <div class="stat-card"><div class="icon">💰</div><div class="label">Total Deposits</div><div class="value" id="totalDeposits">$0</div></div>
+      <div class="stat-card"><div class="icon">📤</div><div class="label">Total Withdrawals</div><div class="value" id="totalWithdrawals">$0</div></div>
+      <div class="stat-card"><div class="icon">📈</div><div class="label">Active Investments</div><div class="value" id="activeInvestments">0</div></div>
+      <div class="stat-card"><div class="icon">⏳</div><div class="label">Pending Transactions</div><div class="value" id="pendingTx">0</div></div>
+      <div class="stat-card"><div class="icon">💬</div><div class="label">Unread Messages</div><div class="value" id="unreadMsgs">0</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+      <div class="card">
+        <div class="card-header"><h3>Transaction Overview</h3></div>
+        <div class="chart-wrap"><canvas id="txChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Recent Users</h3></div>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Balance</th><th>Joined</th></tr></thead>
+          <tbody id="recentUsers"><tr><td colspan="4" style="color:var(--muted);text-align:center;">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>Pending Transactions</h3><a href="transactions.html" class="btn btn-outline" style="font-size:0.8rem;padding:0.4rem 0.9rem;">View All</a></div>
+      <table>
+        <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Method</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="pendingTable"><tr><td colspan="6" style="color:var(--muted);text-align:center;">No pending transactions</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="admin-utils.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+  const admin = requireAdmin();
+  if (admin) {
+    renderAdminSidebar('Dashboard');
+    document.getElementById('dateDisplay').textContent = new Date().toDateString();
+
+    Promise.all([
+      apiFetch('/users'),
+      apiFetch('/transactions'),
+      apiFetch('/plans/all'),
+      apiFetch('/chat/conversations')
+    ]).then(([users, txns, investments, msgs]) => {
+      document.getElementById('totalUsers').textContent = users.length;
+
+      const approved = txns.filter(t => t.status === 'approved');
+      const deposits = approved.filter(t => t.type === 'deposit').reduce((s, t) => s + t.amount, 0);
+      const withdrawals = approved.filter(t => t.type === 'withdrawal').reduce((s, t) => s + t.amount, 0);
+      document.getElementById('totalDeposits').textContent = formatCurrency(deposits);
+      document.getElementById('totalWithdrawals').textContent = formatCurrency(withdrawals);
+      document.getElementById('activeInvestments').textContent = investments.filter(i => i.status === 'active').length;
+
+      const pending = txns.filter(t => t.status === 'pending');
+      document.getElementById('pendingTx').textContent = pending.length;
+      document.getElementById('unreadMsgs').textContent = msgs.filter(m => !m.isRead && !m.isAdminReply).length;
+
+      // Recent users
+      document.getElementById('recentUsers').innerHTML = users.slice(0, 6).map(u => `
+        <tr>
+          <td>${u.fullName}</td>
+          <td style="color:var(--muted);font-size:0.82rem;">${u.email}</td>
+          <td>${formatCurrency(u.balance)}</td>
+          <td>${formatDate(u.createdAt)}</td>
+        </tr>`).join('') || '<tr><td colspan="4" style="color:var(--muted);text-align:center;">No users yet</td></tr>';
+
+      // Pending transactions
+      document.getElementById('pendingTable').innerHTML = pending.slice(0, 5).map(t => `
+        <tr>
+          <td>${t.user?.fullName || '—'}</td>
+          <td style="text-transform:capitalize;">${t.type}</td>
+          <td>${formatCurrency(t.amount)}</td>
+          <td>${t.method || '—'}</td>
+          <td>${formatDate(t.createdAt)}</td>
+          <td style="display:flex;gap:0.4rem;">
+            <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="approveTx('${t._id}')">Approve</button>
+            <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="rejectTx('${t._id}')">Reject</button>
+          </td>
+        </tr>`).join('') || '<tr><td colspan="6" style="color:var(--muted);text-align:center;">No pending transactions</td></tr>';
+
+      // Chart
+      const depCount = txns.filter(t => t.type === 'deposit').length;
+      const witCount = txns.filter(t => t.type === 'withdrawal').length;
+      const pendCount = pending.length;
+      new Chart(document.getElementById('txChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Deposits', 'Withdrawals', 'Pending'],
+          datasets: [{ data: [depCount, witCount, pendCount], backgroundColor: ['#00c896', '#3b82f6', '#f59e0b'], borderWidth: 0 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e2e8f0' } } } }
+      });
+    });
+  }
+
+  async function approveTx(id) {
+    await apiFetch(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'approved', note: 'Approved by admin' }) });
+    location.reload();
+  }
+  async function rejectTx(id) {
+    await apiFetch(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'rejected', note: 'Rejected by admin' }) });
+    location.reload();
+  }
+</script>
+<div id="google_translate_element"></div>
+<script src="../js/translate.js"></script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>
