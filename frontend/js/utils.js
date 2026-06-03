@@ -1,4 +1,4 @@
-const API = 'http://localhost:5000/api';
+const API = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 
 function getToken() { return localStorage.getItem('token'); }
 function getUser() { return JSON.parse(localStorage.getItem('user') || 'null'); }
