@@ -27,10 +27,13 @@ router.put('/:id/balance', protect, adminOnly, async (req, res) => {
 // Admin: toggle user active status
 router.put('/:id/toggle', protect, adminOnly, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    user.isActive = !user.isActive;
-    await user.save();
-    res.json({ message: `User ${user.isActive ? 'activated' : 'suspended'}`, isActive: user.isActive });
+    const user = await User.findById(req.params.id).select('isActive');
+    const updated = await User.findByIdAndUpdate(
+      req.params.id,
+      { isActive: !user.isActive },
+      { new: true }
+    ).select('isActive');
+    res.json({ message: `User ${updated.isActive ? 'activated' : 'suspended'}`, isActive: updated.isActive });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
