@@ -1,41 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const Plan = require('../models/Plan');
-const Investment = require('../models/Investment');
-const User = require('../models/User');
+const { prisma } = require('../config/db');
 const { protect, adminOnly } = require('../middleware/auth');
 
 // Get all active plans (public)
 router.get('/', async (req, res) => {
-  const plans = await Plan.find({ isActive: true });
+  const plans = await prisma.plan.findMany({ where: { isActive: true } });
   res.json(plans);
 });
 
 // Admin: create plan
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const plan = await Plan.create(req.body);
+    const plan = await prisma.plan.create({ data: req.body });
     res.status(201).json(plan);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// Admin: update plan
-router.put('/:id', protect, adminOnly, async (req, res) => {
-  try {
-    const plan = await Plan.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(plan);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// Admin: delete plan
-router.delete('/:id', protect, adminOnly, async (req, res) => {
-  try {
-    await Plan.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Plan deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -45,24 +23,27 @@ router.delete('/:id', protect, adminOnly, async (req, res) => {
 router.post('/invest', protect, async (req, res) => {
   try {
     const { planId, amount } = req.body;
-    const plan = await Plan.findById(planId);
-    if (!plan) return res.status(404).json({ message: 'Plan not found' });
-    if (amount < plan.minAmount || amount > plan.maxAmount) return res.status(400).json({ message: `Amount must be between $${plan.minAmount} and $${plan.maxAmount}` });
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan || !plan.isActive) return res.status(400).json({ message: 'Plan not available' });
+    if (amount < plan.minAmount || amount > plan.maxAmount) {
+      return res.status(400).json({ message: `Amount must be between $${plan.minAmount} and $${plan.maxAmount}` });
+    }
+    if (req.user.balance < amount) return res.status(400).json({ message: 'Insufficient balance' });
 
-    const user = await User.findById(req.user._id);
-    if (user.balance < amount) return res.status(400).json({ message: 'Insufficient balance' });
+    const roiAmount = (amount * plan.roiPercent) / 100;
+    const endDate = new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000);
 
-    const expectedReturn = amount + (amount * plan.roiPercent) / 100;
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + plan.durationDays);
+    await prisma.$transaction([
+      prisma.investment.create({
+        data: { userId: req.user.id, planId, amount, roiAmount, endDate }
+      }),
+      prisma.user.update({
+        where: { id: req.user.id },
+        data: { balance: { decrement: amount }, totalInvested: { increment: amount } }
+      })
+    ]);
 
-    const investment = await Investment.create({ user: user._id, plan: planId, amountInvested: amount, expectedReturn, endDate });
-
-    user.balance -= amount;
-    user.totalInvested += amount;
-    await user.save();
-
-    res.status(201).json(investment);
+    res.json({ message: 'Investment successful' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -70,13 +51,11 @@ router.post('/invest', protect, async (req, res) => {
 
 // Customer: get my investments
 router.get('/my', protect, async (req, res) => {
-  const investments = await Investment.find({ user: req.user._id }).populate('plan');
-  res.json(investments);
-});
-
-// Admin: get all investments
-router.get('/all', protect, adminOnly, async (req, res) => {
-  const investments = await Investment.find().populate('user', 'fullName email').populate('plan');
+  const investments = await prisma.investment.findMany({
+    where: { userId: req.user.id },
+    include: { plan: true },
+    orderBy: { createdAt: 'desc' }
+  });
   res.json(investments);
 });
 
