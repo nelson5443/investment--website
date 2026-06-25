@@ -14,6 +14,11 @@ app.use(express.json());
 const path = require('path');
 app.use(express.static(path.join(__dirname, '../frontend')));
 
+// Test route
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'Server running', time: new Date().toISOString() });
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
@@ -49,21 +54,23 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
   
-  // Auto-deploy database schema
-  await prisma.$executeRaw`CREATE TABLE IF NOT EXISTS "_prisma_migrations" ("id" VARCHAR(36) PRIMARY KEY, "checksum" VARCHAR(64), "finished_at" TIMESTAMPTZ, "migration_name" VARCHAR(255), "logs" TEXT, "rolled_back_at" TIMESTAMPTZ, "started_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "applied_steps_count" INTEGER NOT NULL DEFAULT 0);`;
-  
-  const count = await prisma.plan.count();
-  if (count === 0) {
-    await prisma.plan.createMany({
-      data: [
-        { name: 'Starter', roiPercent: 5, minAmount: 100, maxAmount: 999, durationDays: 7, description: 'Daily Returns' },
-        { name: 'Growth', roiPercent: 15, minAmount: 1000, maxAmount: 9999, durationDays: 14, description: 'Daily Returns' },
-        { name: 'Premium', roiPercent: 30, minAmount: 10000, maxAmount: 49999, durationDays: 30, description: 'Daily Returns' },
-        { name: 'Elite', roiPercent: 50, minAmount: 50000, maxAmount: 999999999, durationDays: 60, description: 'Daily Returns' }
-      ]
-    });
-    console.log('Default plans created');
+  try {
+    const count = await prisma.plan.count();
+    if (count === 0) {
+      await prisma.plan.createMany({
+        data: [
+          { id: '1', name: 'Starter', roiPercent: 5, minAmount: 100, maxAmount: 999, durationDays: 7, description: 'Daily Returns' },
+          { id: '2', name: 'Growth', roiPercent: 15, minAmount: 1000, maxAmount: 9999, durationDays: 14, description: 'Daily Returns' },
+          { id: '3', name: 'Premium', roiPercent: 30, minAmount: 10000, maxAmount: 49999, durationDays: 30, description: 'Daily Returns' },
+          { id: '4', name: 'Elite', roiPercent: 50, minAmount: 50000, maxAmount: 999999999, durationDays: 60, description: 'Daily Returns' }
+        ]
+      });
+      console.log('Default plans created');
+    }
+  } catch (e) {
+    console.log('Plans already exist or error:', e.message);
   }
+  
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 };
 
