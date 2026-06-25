@@ -2,21 +2,35 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { prisma } = require('../config/db');
+const { db } = require('../config/db');
 
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE });
+const generateId = () => Date.now().toString();
 
 // Register customer
 router.post('/register', async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) return res.status(400).json({ message: 'Email already exists' });
+    if (db.users.find(u => u.email === email)) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
     
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: { fullName, email, password: hashedPassword }
-    });
+    const user = {
+      id: generateId(),
+      fullName,
+      email,
+      password: hashedPassword,
+      role: 'customer',
+      balance: 0,
+      totalInvested: 0,
+      totalReturns: 0,
+      isActive: true,
+      isVerified: false,
+      createdAt: new Date()
+    };
+    
+    db.users.push(user);
     
     res.status(201).json({ 
       token: generateToken(user.id), 
@@ -27,19 +41,34 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Register admin (requires secret key)
+// Register admin
 router.post('/register-admin', async (req, res) => {
   try {
     const { fullName, email, password, adminSecret } = req.body;
-    if (adminSecret !== process.env.ADMIN_SECRET) return res.status(403).json({ message: 'Invalid admin secret' });
+    if (adminSecret !== process.env.ADMIN_SECRET) {
+      return res.status(403).json({ message: 'Invalid admin secret' });
+    }
     
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) return res.status(400).json({ message: 'Email already exists' });
+    if (db.users.find(u => u.email === email)) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
     
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: { fullName, email, password: hashedPassword, role: 'ADMIN' }
-    });
+    const user = {
+      id: generateId(),
+      fullName,
+      email,
+      password: hashedPassword,
+      role: 'admin',
+      balance: 0,
+      totalInvested: 0,
+      totalReturns: 0,
+      isActive: true,
+      isVerified: true,
+      createdAt: new Date()
+    };
+    
+    db.users.push(user);
     
     res.status(201).json({ 
       token: generateToken(user.id), 
@@ -50,11 +79,11 @@ router.post('/register-admin', async (req, res) => {
   }
 });
 
-// Login (both admin and customer)
+// Login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = db.users.find(u => u.email === email);
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
     
     const isMatch = await bcrypt.compare(password, user.password);

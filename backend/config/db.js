@@ -1,48 +1,20 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
-
-const connectDB = async () => {
-  try {
-    await prisma.$connect();
-    console.log('Database Connected');
-    
-    // Create tables if they don't exist
-    await prisma.$executeRaw`
-      CREATE TABLE IF NOT EXISTS "User" (
-        "id" TEXT PRIMARY KEY,
-        "fullName" TEXT NOT NULL,
-        "email" TEXT UNIQUE NOT NULL,
-        "password" TEXT NOT NULL,
-        "role" TEXT DEFAULT 'CUSTOMER',
-        "balance" REAL DEFAULT 0,
-        "totalInvested" REAL DEFAULT 0,
-        "totalReturns" REAL DEFAULT 0,
-        "isActive" BOOLEAN DEFAULT true,
-        "isVerified" BOOLEAN DEFAULT false,
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-    
-    await prisma.$executeRaw`
-      CREATE TABLE IF NOT EXISTS "Plan" (
-        "id" TEXT PRIMARY KEY,
-        "name" TEXT NOT NULL,
-        "roiPercent" INTEGER NOT NULL,
-        "minAmount" INTEGER NOT NULL,
-        "maxAmount" INTEGER NOT NULL,
-        "durationDays" INTEGER NOT NULL,
-        "description" TEXT NOT NULL,
-        "isActive" BOOLEAN DEFAULT true,
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-    
-    console.log('Tables created/verified');
-  } catch (error) {
-    console.error(`DB Connection Error: ${error.message}`);
-    process.exit(1);
-  }
+// In-memory database for demo purposes
+const db = {
+  users: [],
+  plans: [
+    { id: '1', name: 'Starter', roiPercent: 5, minAmount: 100, maxAmount: 999, durationDays: 7, description: 'Daily Returns', isActive: true },
+    { id: '2', name: 'Growth', roiPercent: 15, minAmount: 1000, maxAmount: 9999, durationDays: 14, description: 'Daily Returns', isActive: true },
+    { id: '3', name: 'Premium', roiPercent: 30, minAmount: 10000, maxAmount: 49999, durationDays: 30, description: 'Daily Returns', isActive: true },
+    { id: '4', name: 'Elite', roiPercent: 50, minAmount: 50000, maxAmount: 999999999, durationDays: 60, description: 'Daily Returns', isActive: true }
+  ],
+  investments: [],
+  trades: [],
+  transactions: [],
+  messages: []
 };
 
-module.exports = { prisma, connectDB };
+const connectDB = async () => {
+  console.log('In-memory database ready');
+};
+
+module.exports = { db, connectDB };

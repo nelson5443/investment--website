@@ -4,12 +4,9 @@
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js",
-    "db:push": "prisma db push",
-    "db:generate": "prisma generate"
+    "dev": "nodemon backend/server.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
@@ -18,7 +15,6 @@
     "socket.io": "^4.6.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "prisma": "^5.7.0"
+    "nodemon": "^3.0.1"
   }
 }
