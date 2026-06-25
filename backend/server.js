@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const connectDB = require('./config/db');
+const { prisma, connectDB } = require('./config/db');
 
 const app = express();
 const server = http.createServer(app);
@@ -48,15 +48,16 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
-  const Plan = require('./models/Plan');
-  const count = await Plan.countDocuments();
+  const count = await prisma.plan.count();
   if (count === 0) {
-    await Plan.insertMany([
-      { name: 'Starter', roiPercent: 5, minAmount: 100, maxAmount: 999, durationDays: 7, description: 'Daily Returns' },
-      { name: 'Growth', roiPercent: 15, minAmount: 1000, maxAmount: 9999, durationDays: 14, description: 'Daily Returns' },
-      { name: 'Premium', roiPercent: 30, minAmount: 10000, maxAmount: 49999, durationDays: 30, description: 'Daily Returns' },
-      { name: 'Elite', roiPercent: 50, minAmount: 50000, maxAmount: 999999999, durationDays: 60, description: 'Daily Returns' }
-    ]);
+    await prisma.plan.createMany({
+      data: [
+        { name: 'Starter', roiPercent: 5, minAmount: 100, maxAmount: 999, durationDays: 7, description: 'Daily Returns' },
+        { name: 'Growth', roiPercent: 15, minAmount: 1000, maxAmount: 9999, durationDays: 14, description: 'Daily Returns' },
+        { name: 'Premium', roiPercent: 30, minAmount: 10000, maxAmount: 49999, durationDays: 30, description: 'Daily Returns' },
+        { name: 'Elite', roiPercent: 50, minAmount: 50000, maxAmount: 999999999, durationDays: 60, description: 'Daily Returns' }
+      ]
+    });
     console.log('Default plans created');
   }
   server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
