@@ -48,6 +48,10 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
+  
+  // Auto-deploy database schema
+  await prisma.$executeRaw`CREATE TABLE IF NOT EXISTS "_prisma_migrations" ("id" VARCHAR(36) PRIMARY KEY, "checksum" VARCHAR(64), "finished_at" TIMESTAMPTZ, "migration_name" VARCHAR(255), "logs" TEXT, "rolled_back_at" TIMESTAMPTZ, "started_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "applied_steps_count" INTEGER NOT NULL DEFAULT 0);`;
+  
   const count = await prisma.plan.count();
   if (count === 0) {
     await prisma.plan.createMany({
