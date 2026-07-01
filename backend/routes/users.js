@@ -1,49 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { prisma } = require('../config/db');
+const { db } = require('../config/db');
 const { protect, adminOnly } = require('../middleware/auth');
 
-// Get own profile
-router.get('/me', protect, async (req, res) => {
-  res.json(req.user);
+router.get('/me', protect, (req, res) => {
+  const { password, ...user } = req.user;
+  res.json(user);
 });
 
-// Admin: get all users
-router.get('/', protect, adminOnly, async (req, res) => {
-  const users = await prisma.user.findMany({ 
-    where: { role: 'CUSTOMER' },
-    select: { password: false, id: true, fullName: true, email: true, role: true, balance: true, isActive: true, createdAt: true }
-  });
-  res.json(users);
+router.get('/', protect, adminOnly, (req, res) => {
+  res.json(db.users.filter(u => u.role !== 'admin').map(({ password, ...u }) => u));
 });
 
-// Admin: update user balance
-router.put('/:id/balance', protect, adminOnly, async (req, res) => {
-  try {
-    const user = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { balance: req.body.balance },
-      select: { password: false, id: true, fullName: true, email: true, balance: true }
-    });
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+router.put('/:id/balance', protect, adminOnly, (req, res) => {
+  const user = db.users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  user.balance = req.body.balance;
+  const { password, ...safe } = user;
+  res.json(safe);
 });
 
-// Admin: toggle user active status
-router.put('/:id/toggle', protect, adminOnly, async (req, res) => {
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.params.id }, select: { isActive: true } });
-    const updated = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { isActive: !user.isActive },
-      select: { isActive: true }
-    });
-    res.json({ message: `User ${updated.isActive ? 'activated' : 'suspended'}`, isActive: updated.isActive });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+router.put('/:id/toggle', protect, adminOnly, (req, res) => {
+  const user = db.users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  user.isActive = !user.isActive;
+  res.json({ message: `User ${user.isActive ? 'activated' : 'suspended'}`, isActive: user.isActive });
 });
 
 module.exports = router;
