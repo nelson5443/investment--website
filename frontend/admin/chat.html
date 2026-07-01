@@ -46,7 +46,7 @@
 
   if (admin) {
     renderAdminSidebar('Live Chat');
-    const socket = io('http://localhost:5000', { reconnection: true, reconnectionDelay: 1000 });
+    const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin, { reconnection: true, reconnectionDelay: 1000 });
     socket.emit('join', 'admin');
     socket.emit('join', admin.id);
 
