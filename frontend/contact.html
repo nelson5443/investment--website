@@ -102,7 +102,7 @@
     document.getElementById('sidebarName').textContent = user.fullName;
     document.getElementById('avatarInitial').textContent = user.fullName.charAt(0).toUpperCase();
 
-    const socket = io('http://localhost:5000', { reconnection: true, reconnectionDelay: 1000 });
+    const socket = io(window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin, { reconnection: true, reconnectionDelay: 1000 });
     socket.emit('join', user.id);
 
     // Load chat history

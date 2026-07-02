@@ -91,7 +91,7 @@
           <td><span class="badge badge-${p.isActive ? 'success' : 'danger'}">${p.isActive ? 'Active' : 'Inactive'}</span></td>
           <td style="display:flex;gap:0.4rem;">
             <button class="btn btn-accent" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick='editPlan(${JSON.stringify(p)})'>Edit</button>
-            <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="deletePlan('${p._id}')">Delete</button>
+            <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="deletePlan('${p.id}')">Delete</button>
           </td>
         </tr>`).join('');
   }
@@ -106,7 +106,7 @@
   }
 
   function editPlan(plan) {
-    editingPlanId = plan._id;
+    editingPlanId = plan.id;
     document.getElementById('modalTitle').textContent = 'Edit Plan';
     document.getElementById('planName').value = plan.name;
     document.getElementById('planRoi').value = plan.roiPercent;

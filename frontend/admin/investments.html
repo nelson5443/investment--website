@@ -38,21 +38,28 @@
     apiFetch('/plans/all').then(investments => {
       document.getElementById('totalInv').textContent = investments.length;
       document.getElementById('activeInv').textContent = investments.filter(i => i.status === 'active').length;
-      document.getElementById('totalAmt').textContent = formatCurrency(investments.reduce((s, i) => s + i.amountInvested, 0));
-      document.getElementById('totalReturns').textContent = formatCurrency(investments.reduce((s, i) => s + i.expectedReturn, 0));
+      document.getElementById('totalAmt').textContent = formatCurrency(investments.reduce((s, i) => s + i.amount, 0));
+      const totalReturns = investments.reduce((s, i) => s + (i.amount * i.roiPercent / 100), 0);
+      document.getElementById('totalReturns').textContent = formatCurrency(totalReturns);
 
       document.getElementById('invTable').innerHTML = investments.length === 0
         ? '<tr><td colspan="7" style="color:var(--muted);text-align:center;">No investments yet</td></tr>'
-        : investments.map(i => `
+        : investments.map(i => {
+          const user = i.userId ? { fullName: i.userId } : null;
+          const expectedReturn = i.amount + (i.amount * i.roiPercent / 100);
+          const profit = i.amount * i.roiPercent / 100;
+          const endDate = new Date(new Date(i.createdAt).getTime() + i.durationDays * 86400000);
+          return `
           <tr>
-            <td>${i.user?.fullName || '—'}<br/><span style="color:var(--muted);font-size:0.78rem;">${i.user?.email || ''}</span></td>
-            <td>${i.plan?.name || '—'}</td>
-            <td>${formatCurrency(i.amountInvested)}</td>
-            <td>${formatCurrency(i.expectedReturn)}</td>
-            <td style="color:var(--primary);">+${formatCurrency(i.expectedReturn - i.amountInvested)}</td>
-            <td>${formatDate(i.endDate)}</td>
+            <td>${i.userId || '—'}</td>
+            <td>${i.planName || '—'}</td>
+            <td>${formatCurrency(i.amount)}</td>
+            <td>${formatCurrency(expectedReturn)}</td>
+            <td style="color:var(--primary);">+${formatCurrency(profit)}</td>
+            <td>${formatDate(endDate)}</td>
             <td><span class="badge badge-${i.status === 'active' ? 'success' : 'info'}">${i.status}</span></td>
-          </tr>`).join('');
+          </tr>`;
+        }).join('');
     });
   }
 </script>

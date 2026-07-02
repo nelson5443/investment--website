@@ -75,8 +75,8 @@
           <td>${formatDate(t.createdAt)}</td>
           <td>${t.status === 'pending' ? `
             <div style="display:flex;gap:0.4rem;">
-              <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="updateTx('${t._id}','approved')">Approve</button>
-              <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="updateTx('${t._id}','rejected')">Reject</button>
+              <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="updateTx('${t.id}','approved')">Approve</button>
+              <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="updateTx('${t.id}','rejected')">Reject</button>
             </div>` : `<span style="color:var(--muted);font-size:0.82rem;">${t.note || '—'}</span>`}
           </td>
         </tr>`).join('');

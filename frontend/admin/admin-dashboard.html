@@ -92,8 +92,8 @@
           <td>${t.method || '—'}</td>
           <td>${formatDate(t.createdAt)}</td>
           <td style="display:flex;gap:0.4rem;">
-            <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="approveTx('${t._id}')">Approve</button>
-            <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="rejectTx('${t._id}')">Reject</button>
+            <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="approveTx('${t.id}')">Approve</button>
+            <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="rejectTx('${t.id}')">Reject</button>
           </td>
         </tr>`).join('') || '<tr><td colspan="6" style="color:var(--muted);text-align:center;">No pending transactions</td></tr>';
 

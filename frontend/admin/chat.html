@@ -51,6 +51,11 @@
     socket.emit('join', admin.id);
 
     loadConversations();
+    // Poll every 4 seconds so new messages appear without refresh
+    setInterval(() => {
+      loadConversations();
+      if (selectedUserId) openConversation(selectedUserId, selectedUserName, false);
+    }, 4000);
 
     socket.on('receiveMessage', ({ senderId, message, isAdminReply }) => {
       if (!isAdminReply) {
@@ -61,43 +66,42 @@
 
     async function loadConversations() {
       allMessages = await apiFetch('/chat/conversations');
-      // Get unique customers who sent messages
       const seen = new Set();
       const conversations = [];
       allMessages.forEach(m => {
-        if (!m.isAdminReply && m.sender && !seen.has(m.sender._id)) {
-          seen.add(m.sender._id);
-          conversations.push(m);
+        const sid = m.sender?._id || m.senderId;
+        if (!m.isAdminReply && sid && !seen.has(sid)) {
+          seen.add(sid);
+          conversations.push({ ...m, _sid: sid, _sname: m.sender?.fullName || m.senderName || sid });
         }
       });
 
       document.getElementById('conversationsList').innerHTML = conversations.length === 0
         ? '<div style="padding:1rem;color:var(--muted);font-size:0.85rem;">No conversations yet</div>'
         : conversations.map(m => `
-          <div onclick="openConversation('${m.sender._id}','${m.sender.fullName}')"
-            style="padding:0.85rem 1rem;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.2s;"
-            onmouseover="this.style.background='var(--card)'" onmouseout="this.style.background='transparent'">
-            <div style="font-weight:600;font-size:0.9rem;">${m.sender.fullName}</div>
+          <div onclick="openConversation('${m._sid}','${m._sname}')"
+            style="padding:0.85rem 1rem;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.2s;background:${selectedUserId===m._sid?'var(--card)':'transparent'}"
+            onmouseover="this.style.background='var(--card)'" onmouseout="this.style.background='${selectedUserId===m._sid?'var(--card)':'transparent'}'">
+            <div style="font-weight:600;font-size:0.9rem;">${m._sname}</div>
             <div style="color:var(--muted);font-size:0.78rem;margin-top:0.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.message}</div>
           </div>`).join('');
     }
 
-    window.openConversation = function(userId, userName) {
+    window.openConversation = function(userId, userName, resetScroll = true) {
       selectedUserId = userId;
       selectedUserName = userName;
       document.getElementById('chatHeader').textContent = `Chat with ${userName}`;
       document.getElementById('replyBox').style.display = 'flex';
 
-      // Show all messages between this customer and admin
-      const msgs = allMessages.filter(m =>
-        (!m.isAdminReply && m.sender?._id === userId) ||
-        (m.isAdminReply && m.receiver === userId)
-      ).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      const msgs = allMessages.filter(m => {
+        const sid = m.sender?._id || m.senderId;
+        return (!m.isAdminReply && sid === userId) || (m.isAdminReply && (m.receiverId === userId || m.receiver === userId));
+      }).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
       const container = document.getElementById('chatMessages');
       container.innerHTML = '';
       msgs.forEach(m => appendMessage(m.message, m.isAdminReply ? 'admin' : 'customer'));
-      container.scrollTop = container.scrollHeight;
+      if (resetScroll) container.scrollTop = container.scrollHeight;
     };
 
     function appendMessage(msg, from) {
